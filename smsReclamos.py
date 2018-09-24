@@ -12,7 +12,7 @@ class Modem(object):
 		self.open()
 
 	def open(self):
-		self.connection = serial.Serial("/dev/ttyACM0",  460800, timeout=5)
+		self.connection = serial.Serial(self.port,  self.baud, timeout=5)
 
 	def readMessage(self):
 		self.connection.write(READ_ALL_MSG) 
