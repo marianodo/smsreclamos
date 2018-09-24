@@ -29,4 +29,5 @@ if __name__ == '__main__':
 	while True: #Hacer esto si o si con un schedule, no con while true. Doc en https://pypi.org/project/schedule/
 		newMsg = modem.readMessage()
 		logger.info(newMsg)
+		parserMessage(newMsg)
 
