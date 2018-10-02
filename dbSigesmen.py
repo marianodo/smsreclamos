@@ -1,16 +1,15 @@
 import MySQLdb
+import json
 
-USER = "root"
-PASS = "root"
-HOST = "192.168.1.7"
-PORT = 3306
-DATABASE = "sigesmen"
+DATABASE_FILE = "dbConf.json"
 
-INSERT_MESSAGE = "INSERT INTO bla() VALUES(%s,%s)"
-GET_CLIENT = "SELECT id FROM bla WHERE code = %s"
+
+INSERT_MESSAGE = "INSERT INTO mea_mensajes_alarma(mea_codigo_cliente, mea_grupo, mea_fecha, mea_hora, mea_contenido, mea_codigo_accion, mea_estado, mea_verificado) VALUES ({0}, 1, CURRENT_DATE(), CURRENT_TIME(), '{1}', 0, 1, 0)"
+GET_CLIENT = "SELECT EXISTS(SELECT * FROM cli_clientes WHERE cli_codigo =  {0} )"
+GET_CLAIM_ID = "SELECT men_id from men_mensajes WHERE men_origen_id = {0}"
 
 class Database(object):
-	__instance   = None
+    __instance   = None
     __host       = None
     __user       = None
     __password   = None
@@ -18,17 +17,13 @@ class Database(object):
     __session    = None
     __connection = None
 
-    def __new__(cls, *args, **kwargs):
-        if not cls.__instance or not cls.__database:
-             cls.__instance = super(MysqlPython, cls).__new__(cls,*args,**kwargs)
-        return cls.__instance
-    ## End def __new__
 
-    def __init__(self):
-        self.__host     = HOST
-        self.__user     = USER
-        self.__password = PASS
-        self.__database = DATABASE
+    def __init__(self, user, password, host, port, database):
+        self.__user     = user
+        self.__password = password
+        self.__host     = host
+        self.__port     = port
+        self.__database = database
     ## End def __init__
 
     def __open(self):
@@ -44,19 +39,39 @@ class Database(object):
         self.__session.close()
         self.__connection.close()
     ## End def __close
-	
-	def isCodeExists(self, code):
+    
+    def __selectOneRow(self, query):
         self.__open()
-        self.__session.execute(query, values)
-		self.cursor.execute(GET_CLIENT.format(code))
-		
-	def __enter__(self):
-		return self
+        self.__session.execute(query)
+        return self.__session.fetchone()[0]
 
-	def __exit__(self, ext_type, exc_value, traceback):
-		self.cursor.close()
-		if isinstance(exc_value, Exception):
-			self.connection.rollback()
-		else:
-			self.connection.commit()
-		self.connection.close()
+    def isCodeExists(self, code):
+        return self.__selectOneRow(GET_CLIENT.format(code))
+
+    def sendMessage(self, code, message):
+        self.__open()
+        self.__session.execute(INSERT_MESSAGE.format(code, message))
+        self.__connection.commit()
+        self.__close()
+        return self.__session.lastrowid
+
+    def getClaimId(self, messageId):
+        return self.__selectOneRow(GET_CLAIM_ID.format(messageId))
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, ext_type, exc_value, traceback):
+        self.cursor.close()
+        if isinstance(exc_value, Exception):
+            self.connection.rollback()
+        else:
+            self.connection.commit()
+        self.connection.close()
+
+
+if __name__ == '__main__':
+    with open(DATABASE_FILE) as db:
+            configFile = json.load(db)
+    db = Database(configFile["user"], configFile["passwd"], configFile["host"], configFile["port"], configFile["database"])
+    print db.getClaimId(2477)
