@@ -28,7 +28,7 @@ class Database(object):
 
     def __open(self):
         try:
-            cnx = MySQLdb.connect(self.__host, self.__user, self.__password, self.__database)
+            cnx = MySQLdb.connect(host = self.__host, user = self.__user, passwd = self.__password, db = self.__database, port = self.__port)
             self.__connection = cnx
             self.__session    = cnx.cursor()
         except MySQLdb.Error as e:
@@ -70,8 +70,7 @@ class Database(object):
         self.connection.close()
 
 
-if __name__ == '__main__':
-    with open(DATABASE_FILE) as db:
-            configFile = json.load(db)
-    db = Database(configFile["user"], configFile["passwd"], configFile["host"], configFile["port"], configFile["database"])
-    print db.getClaimId(2477)
+# if __name__ == '__main__':
+#     with open(DATABASE_FILE) as db:
+#             configFile = json.load(db)
+#     db = Database(configFile["user"], configFile["passwd"], configFile["host"], configFile["port"], configFile["database"])
