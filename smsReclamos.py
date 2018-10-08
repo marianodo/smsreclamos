@@ -6,7 +6,7 @@ import logging
 
 logging.basicConfig(filename='smsReclamos.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
-PORT = "/dev/ttyUSB1"
+PORT = "/dev/ttyUSB0"
 BAUD = 115200
 IS_ALIVE = 'AT\r'
 TEXT_MODE = 'AT+CMGF=1\r'
