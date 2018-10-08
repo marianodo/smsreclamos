@@ -6,7 +6,7 @@ import logging
 
 logging.basicConfig(filename='smsReclamos.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
-PORT = "/dev/ttyUSB0"
+PORT = "/dev/ttyUSB1"
 BAUD = 115200
 IS_ALIVE = 'AT\r'
 TEXT_MODE = 'AT+CMGF=1\r'
@@ -24,40 +24,49 @@ class Modem(object):
 		self.initModem()
 
 	def initModem(self):
-		isAliveCnt = 0
-		textConfigCnt = 0
-		stringConfigCnt = 0
 		self.open()
 		time.sleep(1)
+		self.isModemAlive()
+		self.modemTextMode()
+		self.modemStringMode()
+		self.connection.close()
+
+	def isModemAlive(self):
+		isAliveCnt = 0
 		while isAliveCnt < 3:
 			self.connection.write(IS_ALIVE)				# Pregunto si el modem esta vivo
 			time.sleep(1)
 			atResp = self.connection.readlines(2)
+			print(atResp)
 			if(atResp[-1] == 'OK\r\n'):
 				break
 			time.sleep(1)
 			isAliveCnt += 1
-
+	
+	def modemTextMode(self):
+		textConfigCnt = 0
 		while textConfigCnt < 3:
 			self.connection.write(TEXT_MODE)			# Modem en modo texto
 			time.sleep(1)
 			cmgfResp = self.connection.readlines(2)
+			print(cmgfResp)
 			if(cmgfResp[-1] == 'OK\r\n'):
 				break
 			time.sleep(1)
 			textConfigCnt += 1
 
+	def modemStringMode(self):
+		stringConfigCnt = 0
 		while stringConfigCnt < 3:
 			self.connection.write(STRING_MODE)			# Para el modo texto, encoding tipo string
 			time.sleep(1)
 			csResp = self.connection.readlines(2)
+			print(csResp)
 			if(csResp[-1] == 'OK\r\n'):
 				break
 			time.sleep(1)
 			stringConfigCnt += 1
-
-		self.connection.close()
-
+	
 	def open(self):
 		self.connection = serial.Serial(self.port,  self.baud, timeout=3)
 
