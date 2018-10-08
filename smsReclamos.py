@@ -62,7 +62,6 @@ class Modem(object):
 		self.connection = serial.Serial(self.port,  self.baud, timeout=3)
 
 	def readMessage(self):
-		
 		self.open()
 		time.sleep(1)
 		self.connection.write(READ_ALL_MSG)
@@ -113,7 +112,7 @@ class Parser(object):
 	def parseMetadata(self, data):
 		#data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
 		parsedMeta = data.split(",")
-		#parsedMeta ['+CMGL: 0', '"REC READ"', '"+543513162097"', '', '"18/10/02', '19:10:15-12"\r\n']
+		#parsedMeta = ['+CMGL: 0', '"REC READ"', '"+543513162097"', '', '"18/10/02', '19:10:15-12"\r\n']
 		phone = (parsedMeta[2]).strip('"')
 		return phone
 
@@ -136,14 +135,12 @@ if __name__ == '__main__':
 		#print("Corriendo programa")
 
 		#newMsg = modem.readMessage()
-
-       	#modem.parseMessage(newMsg)
-
+		#parser.parseMessage(newMsg)
+		#modem.deleteAllMessages()
 
 	#schedule.every(1).minutes.do(mainFun)
 
 	while True:
-
 		#schedule.run_pending()
     	#time.sleep(1)
 		print("Corriendo programa")
