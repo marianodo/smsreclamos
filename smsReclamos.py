@@ -5,12 +5,16 @@ import re
 import logging
 
 logging.basicConfig(filename='smsReclamos.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
-logging.debug('This will get logged to a file')
 
 PORT = "/dev/ttyUSB0"
 BAUD = 115200
-READ_ALL_MSG = 'AT+CMGL="ALL"'
-DEL_POS_MSG = 'AT+CMGD=1,4'
+IS_ALIVE = 'AT\r'
+TEXT_MODE = 'AT+CMGF=1\r'
+STRING_MODE = 'AT+CSCS="IRA"\r'
+READ_ALL_MSG = 'AT+CMGL="ALL"\r'
+DEL_ALL_MSG = 'AT+CMGD=1,4\r'
+ERR = -1
+INVALID_FORMAT = 'Error, formato no valido'
 
 class Modem(object):
 	def __init__(self, port, baud):
@@ -20,37 +24,37 @@ class Modem(object):
 		self.initModem()
 
 	def initModem(self):
-		i = 0
-		j = 0
-		k = 0
+		isAliveCnt = 0
+		textConfigCnt = 0
+		stringConfigCnt = 0
 		self.open()
 		time.sleep(1)
-		while i < 3:
-			self.connection.write('AT\r')				# Pregunto si el modem esta vivo
+		while isAliveCnt < 3:
+			self.connection.write(IS_ALIVE)				# Pregunto si el modem esta vivo
 			time.sleep(1)
 			atResp = self.connection.readlines(2)
 			if(atResp[-1] == 'OK\r\n'):
 				break
 			time.sleep(1)
-			i = i + 1
+			isAliveCnt += 1
 
-		while j < 3:
-			self.connection.write('AT+CMGF=1\r')		# Modem en modo texto
+		while textConfigCnt < 3:
+			self.connection.write(TEXT_MODE)		# Modem en modo texto
 			time.sleep(1)
 			cmgfResp = self.connection.readlines(2)
 			if(cmgfResp[-1] == 'OK\r\n'):
 				break
 			time.sleep(1)
-			j = j + 1
+			textConfigCnt += 1
 
-		while k < 3:
-			self.connection.write('AT+CSCS="IRA"\r')	# Para el modo texto, encoding tipo string
+		while stringConfigCnt < 3:
+			self.connection.write(STRING_MODE)	# Para el modo texto, encoding tipo string
 			time.sleep(1)
 			csResp = self.connection.readlines(2)
 			if(csResp[-1] == 'OK\r\n'):
 				break
 			time.sleep(1)
-			k = k + 1
+			stringConfigCnt += 1
 
 		self.connection.close()
 
@@ -61,7 +65,7 @@ class Modem(object):
 		
 		self.open()
 		time.sleep(1)
-		self.connection.write('AT+CMGL="ALL"\r')
+		self.connection.write(READ_ALL_MSG)
 		time.sleep(1)
 		rawResponse = self.connection.readlines()
 		self.connection.close()
@@ -69,19 +73,16 @@ class Modem(object):
 		return rawResponse
 
 	def parseMessage(self, rawMessage):
-
 		def parseMetadata(data):
 			#data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
 			parsedMeta = data.split(",")
 			#parsedMeta ['+CMGL: 0', '"REC READ"', '"+543513162097"', '', '"18/10/02', '19:10:15-12"\r\n']
 			phone = (parsedMeta[2]).strip('"')
-			
 			return phone
 
 
 		def parseMsg(data):
 			#data = '3407 Dirigirse a Rivadeo 1486 por ascensor fuera de servicio'
-	
 			match = re.match(r"\d{4}",data.strip())				# Busco si el mensaje empieza con 4 digitos numericos
 		
 			if(match):
@@ -91,18 +92,16 @@ class Modem(object):
 
 			else:	
 				logging.warning("Formato invalido")		
-				return -1, "Error, formato no valido"	
+				return ERR, INVALID_FORMAT	
 
-		def deleteMessage(self):
-			
+		def deleteAllMessages(self):
 			self.open()
 			time.sleep(1)
-			self.connection.write('AT+CMGD=1,4') 
+			self.connection.write(DEL_ALL_MSG) 
 			self.connection.close()
 
-
-		rawMessage.pop(0)
-		rawMessage.pop(-1)
+		rawMessage.pop(0)										# Elimino el primer elemento de la lista ("\r\n")
+		rawMessage.pop(-1)										# Elimino el ultimo elemento de la lista ("OK\r\n")
 
 		'''
 		['+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n', 
@@ -132,7 +131,7 @@ class Modem(object):
 
 
 
-		#self.deleteMessage()
+		#self.deleteAllMessages()
 
 
 
