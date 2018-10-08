@@ -39,7 +39,7 @@ class Modem(object):
 			isAliveCnt += 1
 
 		while textConfigCnt < 3:
-			self.connection.write(TEXT_MODE)		# Modem en modo texto
+			self.connection.write(TEXT_MODE)			# Modem en modo texto
 			time.sleep(1)
 			cmgfResp = self.connection.readlines(2)
 			if(cmgfResp[-1] == 'OK\r\n'):
@@ -48,7 +48,7 @@ class Modem(object):
 			textConfigCnt += 1
 
 		while stringConfigCnt < 3:
-			self.connection.write(STRING_MODE)	# Para el modo texto, encoding tipo string
+			self.connection.write(STRING_MODE)			# Para el modo texto, encoding tipo string
 			time.sleep(1)
 			csResp = self.connection.readlines(2)
 			if(csResp[-1] == 'OK\r\n'):
@@ -72,37 +72,19 @@ class Modem(object):
 		logging.info(rawResponse)
 		return rawResponse
 
+	def deleteAllMessages(self):
+		self.open()
+		time.sleep(1)
+		#self.connection.write(DEL_ALL_MSG)						# Linea comentada para evitar que borre los mensajes 
+		self.connection.close()
+
+class Parser(object):
+	def __init__(self):
+		pass
+
 	def parseMessage(self, rawMessage):
-		def parseMetadata(data):
-			#data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
-			parsedMeta = data.split(",")
-			#parsedMeta ['+CMGL: 0', '"REC READ"', '"+543513162097"', '', '"18/10/02', '19:10:15-12"\r\n']
-			phone = (parsedMeta[2]).strip('"')
-			return phone
-
-
-		def parseMsg(data):
-			#data = '3407 Dirigirse a Rivadeo 1486 por ascensor fuera de servicio'
-			match = re.match(r"\d{4}",data.strip())				# Busco si el mensaje empieza con 4 digitos numericos
-		
-			if(match):
-				code = match.group()							# Si es asi guardo la coincidencia encontrada
-				message = (re.sub(code,'',data)).strip()
-				return code, message
-
-			else:	
-				logging.warning("Formato invalido")		
-				return ERR, INVALID_FORMAT	
-
-		def deleteAllMessages(self):
-			self.open()
-			time.sleep(1)
-			self.connection.write(DEL_ALL_MSG) 
-			self.connection.close()
-
 		rawMessage.pop(0)										# Elimino el primer elemento de la lista ("\r\n")
 		rawMessage.pop(-1)										# Elimino el ultimo elemento de la lista ("OK\r\n")
-
 		'''
 		['+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n', 
 		'3407 Dirigirse a Rivadeo 1486 por ascensor fuera de servicio\r\n', '+CMGL: 1,"REC READ","22123",,
@@ -122,22 +104,34 @@ class Modem(object):
 		"+543513998344",,"18/10/02,02:30:25-12"\r\n', '9999 PRUEBA TEST SMS (79555)\r\n', '+CMGL: 14,"REC READ",
 		"+543515073753",,"18/10/02,03:00:31-12"\r\n', '9999 PRUEBA TEST SMS (79556)\r\n']
 		'''
-
 		for pos in xrange(0, len(rawMessage), 2):
-			phone = parseMetadata(rawMessage[pos])
-			code, message = parseMsg(rawMessage[pos + 1])
+			phone = self.parseMetadata(rawMessage[pos])
+			code, message = self.parseMsg(rawMessage[pos + 1])
 			print(phone)
 			print(code,message)
 
+	def parseMetadata(self, data):
+		#data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
+		parsedMeta = data.split(",")
+		#parsedMeta ['+CMGL: 0', '"REC READ"', '"+543513162097"', '', '"18/10/02', '19:10:15-12"\r\n']
+		phone = (parsedMeta[2]).strip('"')
+		return phone
 
-
-		#self.deleteAllMessages()
-
-
+	def parseMsg(self, data):
+		#data = '3407 Dirigirse a Rivadeo 1486 por ascensor fuera de servicio'
+		match = re.match(r"\d{4}",data.strip())				# Busco si el mensaje empieza con 4 digitos numericos
+	
+		if(match):
+			code = match.group()							# Si es asi guardo la coincidencia encontrada
+			message = (re.sub(code,'',data)).strip()
+			return code, message
+		else:	
+			logging.warning("Formato invalido")		
+			return ERR, INVALID_FORMAT
 
 if __name__ == '__main__':
 	modem = Modem(PORT, BAUD)
-
+	parser = Parser()
 	#def mainFun():
 		#print("Corriendo programa")
 
@@ -155,6 +149,6 @@ if __name__ == '__main__':
 		print("Corriendo programa")
 
 		newMsg = modem.readMessage()
-		modem.parseMessage(newMsg)
-
+		parser.parseMessage(newMsg)
+		modem.deleteAllMessages()
 
