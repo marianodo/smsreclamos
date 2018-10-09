@@ -3,6 +3,8 @@ import serial
 import time
 import re
 import logging
+import json
+from dbSigesmen import Database
 
 logging.basicConfig(filename='smsReclamos.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
@@ -89,7 +91,7 @@ class Modem(object):
 	def deleteAllMessages(self):
 		self.open()
 		time.sleep(1)
-		#self.connection.write(DEL_ALL_MSG)						# Linea comentada para evitar que borre los mensajes 
+		self.connection.write(DEL_ALL_MSG)
 		self.connection.close()
 
 class Parser(object):
@@ -122,14 +124,15 @@ class Parser(object):
 			phone = self.parseMetadata(rawMessage[pos])
 			code, message = self.parseMsg(rawMessage[pos + 1])
 
-			if code != ERR:
-				if db.isCodeExists(code):
-					db.sendMessage(code, "{0}. Enviado por: {1}".format(message, phone))
-					db.answerCustomer("Su mensaje a la clave: {0} se ha enviado correctamente. Muchas gracias".format(code), phone)
+			if code != 9999:
+				if code != ERR:
+					if db.isCodeExists(code):
+						db.sendMessage(code, "{0}. Enviado por: {1}".format(message, phone))
+						db.answerCustomer("Su mensaje a la clave: {0} se ha enviado correctamente. Muchas gracias".format(code), phone)
+					else:
+						db.answerCustomer("El codigo {0} no pertence a nuestra base de datos.".format(code), phone)
 				else:
-					db.answerCustomer("El codigo {0} no pertence a nuestra base de datos.".format(code), phone)
-			else:
-				db.answerCustomer("Formato invalido. Recuerde que es Codigo o Clave y luego el mensaje. Muchas Gracias", phone)
+					db.answerCustomer("Formato invalido. Recuerde que es Codigo o Clave y luego el mensaje. Muchas Gracias", phone)
 
 	def parseMetadata(self, data):
 		#data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
@@ -155,21 +158,20 @@ if __name__ == '__main__':
 	parser = Parser()
 
 	
-	#def mainFun():
+	def mainFun():
+		print("Corriendo programa")
+		newMsg = modem.readMessage()
+		parser.parseMessage(newMsg)
+		modem.deleteAllMessages()
+
+	schedule.every(10).seconds.do(mainFun)
+
+	while True:
+		schedule.run_pending()
+    	time.sleep(1)
 		#print("Corriendo programa")
 
 		#newMsg = modem.readMessage()
 		#parser.parseMessage(newMsg)
 		#modem.deleteAllMessages()
-
-	#schedule.every(1).minutes.do(mainFun)
-
-	while True:
-		#schedule.run_pending()
-    	#time.sleep(1)
-		print("Corriendo programa")
-
-		newMsg = modem.readMessage()
-		parser.parseMessage(newMsg)
-		modem.deleteAllMessages()
 
