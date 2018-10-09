@@ -6,6 +6,11 @@ import logging
 
 logging.basicConfig(filename='smsReclamos.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
+DATABASE_FILE = "dbConf.json"
+with open(DATABASE_FILE) as db:
+            configFile = json.load(db)
+db = Database(configFile["user"], configFile["passwd"], configFile["host"], configFile["port"], configFile["database"])
+
 PORT = "/dev/ttyUSB0"
 BAUD = 115200
 IS_ALIVE = 'AT\r'
@@ -13,6 +18,7 @@ TEXT_MODE = 'AT+CMGF=1\r'
 STRING_MODE = 'AT+CSCS="IRA"\r'
 READ_ALL_MSG = 'AT+CMGL="ALL"\r'
 DEL_ALL_MSG = 'AT+CMGD=1,4\r'
+ACK_MODEM = 'OK\r\n'
 ERR = -1
 INVALID_FORMAT = 'Error, formato no valido'
 
@@ -38,7 +44,7 @@ class Modem(object):
 			time.sleep(1)
 			atResp = self.connection.readlines(2)
 			print(atResp)
-			if(atResp[-1] == 'OK\r\n'):
+			if(atResp[-1] == ACK_MODEM):
 				break
 			time.sleep(1)
 			isAliveCnt += 1
@@ -50,7 +56,7 @@ class Modem(object):
 			time.sleep(1)
 			cmgfResp = self.connection.readlines(2)
 			print(cmgfResp)
-			if(cmgfResp[-1] == 'OK\r\n'):
+			if(cmgfResp[-1] == ACK_MODEM):
 				break
 			time.sleep(1)
 			textConfigCnt += 1
@@ -62,7 +68,7 @@ class Modem(object):
 			time.sleep(1)
 			csResp = self.connection.readlines(2)
 			print(csResp)
-			if(csResp[-1] == 'OK\r\n'):
+			if(csResp[-1] == ACK_MODEM):
 				break
 			time.sleep(1)
 			stringConfigCnt += 1
@@ -115,8 +121,15 @@ class Parser(object):
 		for pos in xrange(0, len(rawMessage), 2):
 			phone = self.parseMetadata(rawMessage[pos])
 			code, message = self.parseMsg(rawMessage[pos + 1])
-			print(phone)
-			print(code,message)
+
+			if code != ERR:
+				if db.isCodeExists(code):
+					db.sendMessage(code, "{0}. Enviado por: {1}".format(message, phone))
+					db.answerCustomer("Su mensaje a la clave: {0} se ha enviado correctamente. Muchas gracias".format(code), phone)
+				else:
+					db.answerCustomer("El codigo {0} no pertence a nuestra base de datos.".format(code), phone)
+			else:
+				db.answerCustomer("Formato invalido. Recuerde que es Codigo o Clave y luego el mensaje. Muchas Gracias", phone)
 
 	def parseMetadata(self, data):
 		#data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
@@ -140,6 +153,8 @@ class Parser(object):
 if __name__ == '__main__':
 	modem = Modem(PORT, BAUD)
 	parser = Parser()
+
+	
 	#def mainFun():
 		#print("Corriendo programa")
 
