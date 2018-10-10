@@ -1,5 +1,6 @@
 import schedule
 import serial
+import sys
 import time
 import re
 import logging
@@ -9,10 +10,13 @@ from dbSigesmen import Database
 logging.basicConfig(filename='smsReclamos.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
 
 DATABASE_FILE = "dbConf.json"
-with open(DATABASE_FILE) as db:
-            configFile = json.load(db)
-db = Database(configFile["user"], configFile["passwd"], configFile["host"], configFile["port"], configFile["database"])
-
+try:
+	with open(DATABASE_FILE) as db:
+		    configFile = json.load(db)
+	db = Database(configFile["user"], configFile["passwd"], configFile["host"], configFile["port"], configFile["database"])
+except:
+	logger.error("Error al abrir la BD. Revisar")
+	sys.exit()
 PORT = "/dev/ttyUSB0"
 BAUD = 115200
 IS_ALIVE = 'AT\r'
@@ -22,8 +26,9 @@ READ_ALL_MSG = 'AT+CMGL="ALL"\r'
 DEL_ALL_MSG = 'AT+CMGD=1,4\r'
 ACK_MODEM = 'OK\r\n'
 ERR = -1
-INVALID_FORMAT = 'Error, formato no valido'
-
+INVALID_FORMAT = 'Respuesta Automatica. Mensaje Incorrecto. Recuerde que es codigo o clave y luego el mensaje que desee. Muchas Gracias'
+BAD_CODE = "El codigo {0} no pertence a nuestra base de datos."
+ANSWER_TO_CUSTOMER = "Su mensaje a la clave: {0} se ha enviado correctamente. Muchas gracias"
 class Modem(object):
 	def __init__(self, port, baud):
 		self.port = port
@@ -41,11 +46,11 @@ class Modem(object):
 
 	def isModemAlive(self):
 		isAliveCnt = 0
+		#TODO Escribir en la BD si el modem no responde
 		while isAliveCnt < 3:
 			self.connection.write(IS_ALIVE)				# Pregunto si el modem esta vivo
 			time.sleep(1)
 			atResp = self.connection.readlines(2)
-			print(atResp)
 			if(atResp[-1] == ACK_MODEM):
 				break
 			time.sleep(1)
@@ -53,11 +58,11 @@ class Modem(object):
 	
 	def modemTextMode(self):
 		textConfigCnt = 0
+		#TODO Escribir en la BD por si no se pudo configurar el Modem
 		while textConfigCnt < 3:
 			self.connection.write(TEXT_MODE)			# Modem en modo texto
 			time.sleep(1)
 			cmgfResp = self.connection.readlines(2)
-			print(cmgfResp)
 			if(cmgfResp[-1] == ACK_MODEM):
 				break
 			time.sleep(1)
@@ -65,11 +70,11 @@ class Modem(object):
 
 	def modemStringMode(self):
 		stringConfigCnt = 0
+		#TODO Escribir en la BD por si no se pudo configurar el Modem
 		while stringConfigCnt < 3:
-			self.connection.write(STRING_MODE)			# Para el modo texto, encoding tipo string
+			self.connection.write(STRING_MODE) # Para el modo texto, encoding tipo string
 			time.sleep(1)
 			csResp = self.connection.readlines(2)
-			print(csResp)
 			if(csResp[-1] == ACK_MODEM):
 				break
 			time.sleep(1)
@@ -95,12 +100,9 @@ class Modem(object):
 		self.connection.close()
 
 class Parser(object):
-	def __init__(self):
-		pass
-
 	def parseMessage(self, rawMessage):
-		rawMessage.pop(0)										# Elimino el primer elemento de la lista ("\r\n")
-		rawMessage.pop(-1)										# Elimino el ultimo elemento de la lista ("OK\r\n")
+		rawMessage.pop(0) # Elimino el primer elemento de la lista ("\r\n")
+		rawMessage.pop(-1) # Elimino el ultimo elemento de la lista ("OK\r\n")
 		'''
 		['+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n', 
 		'3407 Dirigirse a Rivadeo 1486 por ascensor fuera de servicio\r\n', '+CMGL: 1,"REC READ","22123",,
@@ -112,11 +114,6 @@ class Parser(object):
 		,,"18/10/02,19:37:45-12"\r\n', 'El nro. 3513024522  llamo el 02/10 19:37  Para llamarlo, presiona SEND.\r\n', 
 		'+CMGL: 6,"REC READ","22123",,"18/10/02,23:24:26-12"\r\n', 'Telegram code 95705\r\n', '+CMGL: 7,"REC READ",
 		"+543513998344",,"18/10/01,23:30:31-12"\r\n', '9999 PRUEBA TEST SMS (79549)\r\n', '+CMGL: 8,"REC READ",
-		"+543513998344",,"18/10/02,00:00:13-12"\r\n', '9999 PRUEBA TEST SMS (79550)\r\n', '+CMGL: 9,"REC READ",
-		"+543513998344",,"18/10/02,00:30:43-12"\r\n', '9999 PRUEBA TEST SMS (79551)\r\n', '+CMGL: 10,"REC READ",
-		"+543515073753",,"18/10/02,01:00:34-12"\r\n', '9999 PRUEBA TEST SMS (79552)\r\n', '+CMGL: 11,"REC READ",
-		"+543513998344",,"18/10/02,01:30:42-12"\r\n', '9999 PRUEBA TEST SMS (79553)\r\n', '+CMGL: 12,"REC READ",
-		"+543515073753",,"18/10/02,02:00:18-12"\r\n', '9999 PRUEBA TEST SMS (79554)\r\n', '+CMGL: 13,"REC READ",
 		"+543513998344",,"18/10/02,02:30:25-12"\r\n', '9999 PRUEBA TEST SMS (79555)\r\n', '+CMGL: 14,"REC READ",
 		"+543515073753",,"18/10/02,03:00:31-12"\r\n', '9999 PRUEBA TEST SMS (79556)\r\n']
 		'''
@@ -128,11 +125,11 @@ class Parser(object):
 				if code != ERR:
 					if db.isCodeExists(code):
 						db.sendMessage(code, "{0}. Enviado por: {1}".format(message, phone))
-						db.answerCustomer("Su mensaje a la clave: {0} se ha enviado correctamente. Muchas gracias".format(code), phone)
+						db.answerCustomer(ANSWER_TO_CUSTOMER.format(code), phone)
 					else:
-						db.answerCustomer("El codigo {0} no pertence a nuestra base de datos.".format(code), phone)
+						db.answerCustomer(BAD_CODE.format(code), phone)
 				else:
-					db.answerCustomer("Formato invalido. Recuerde que es Codigo o Clave y luego el mensaje. Muchas Gracias", phone)
+					db.answerCustomer(INVALID_FORMAT, phone)
 
 	def parseMetadata(self, data):
 		#data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
@@ -143,10 +140,9 @@ class Parser(object):
 
 	def parseMsg(self, data):
 		#data = '3407 Dirigirse a Rivadeo 1486 por ascensor fuera de servicio'
-		match = re.match(r"\d{4}",data.strip())				# Busco si el mensaje empieza con 4 digitos numericos
-	
+		match = re.match(r"\d{4}",data.strip())	# Busco si el mensaje empieza con 4 digitos numericos
 		if(match):
-			code = match.group()							# Si es asi guardo la coincidencia encontrada
+			code = match.group() # Si es asi guardo la coincidencia encontrada
 			message = (re.sub(code,'',data)).strip()
 			return code, message
 		else:	
@@ -157,7 +153,6 @@ if __name__ == '__main__':
 	modem = Modem(PORT, BAUD)
 	parser = Parser()
 
-	
 	def mainFun():
 		print("Corriendo programa")
 		newMsg = modem.readMessage()
@@ -168,10 +163,3 @@ if __name__ == '__main__':
 
 	while True:
 		schedule.run_pending()
-    	time.sleep(1)
-		#print("Corriendo programa")
-
-		#newMsg = modem.readMessage()
-		#parser.parseMessage(newMsg)
-		#modem.deleteAllMessages()
-
