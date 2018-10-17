@@ -5,6 +5,8 @@ import time
 import re
 import logging
 import json
+import thread
+import datetime
 from dbSigesmen import Database
 
 logging.basicConfig(filename='smsReclamos.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s', level=logging.DEBUG)
@@ -15,7 +17,7 @@ try:
 		    configFile = json.load(db)
 	db = Database(configFile["user"], configFile["passwd"], configFile["host"], configFile["port"], configFile["database"])
 except:
-	logger.error("Error al abrir la BD. Revisar")
+	logging.error("Error al abrir la BD. Revisar")
 	sys.exit()
 PORT = "/dev/ttyUSB0"
 BAUD = 115200
@@ -26,6 +28,9 @@ READ_ALL_MSG = 'AT+CMGL="ALL"\r'
 DEL_ALL_MSG = 'AT+CMGD=1,4\r'
 ACK_MODEM = 'OK\r\n'
 ERR = -1
+TEST_CODE = 9999
+ANSWER_TEST_CODE = 9998
+ANSWER_TEST_MSG = "Recibido Test SMS {0}. {1}"
 INVALID_FORMAT = 'Respuesta Automatica. Mensaje Incorrecto. Recuerde que es codigo o clave y luego el mensaje que desee. Muchas Gracias'
 BAD_CODE = "El codigo {0} no pertence a nuestra base de datos."
 ANSWER_TO_CUSTOMER = "Su mensaje a la clave: {0} se ha enviado correctamente. Muchas gracias"
@@ -90,7 +95,6 @@ class Modem(object):
 		time.sleep(1)
 		rawResponse = self.connection.readlines()
 		self.connection.close()
-		logging.info(rawResponse)
 		return rawResponse
 
 	def deleteAllMessages(self):
@@ -121,15 +125,20 @@ class Parser(object):
 			phone = self.parseMetadata(rawMessage[pos])
 			code, message = self.parseMsg(rawMessage[pos + 1])
 
-			if code != 9999:
-				if code != ERR:
+			if code is not ERR:
+				logging.info("Tel: {0} - Codigo: {1} - Mensaje: {2}".format(phone, code, message))
+				if code is not TEST_CODE:
 					if db.isCodeExists(code):
 						db.sendMessage(code, "{0}. Enviado por: {1}".format(message, phone))
 						db.answerCustomer(ANSWER_TO_CUSTOMER.format(code), phone)
 					else:
 						db.answerCustomer(BAD_CODE.format(code), phone)
 				else:
-					db.answerCustomer(INVALID_FORMAT, phone)
+					answerTest = ANSWER_TEST_MSG.format(message.split()[-1], phone)
+					db.sendMessage(ANSWER_TEST_CODE, answerTest)
+			else:
+				logging.warning("Mensaje Invalido: {1}".format(rawMessage[pos +1]))
+				db.answerCustomer(INVALID_FORMAT, phone)
 
 	def parseMetadata(self, data):
 		#data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
@@ -150,15 +159,22 @@ class Parser(object):
 			return ERR, INVALID_FORMAT
 
 if __name__ == '__main__':
+	print("Iniciando programa")
 	modem = Modem(PORT, BAUD)
 	parser = Parser()
 
 	def mainFun():
-		print("Corriendo programa")
 		newMsg = modem.readMessage()
 		parser.parseMessage(newMsg)
 		modem.deleteAllMessages()
 
+	def printDatetime():
+		while True:
+			sys.stdout.write('%s\r' % datetime.datetime.now().strftime('%d-%m-%Y %H:%M:%S'))
+			sys.stdout.flush()
+			time.sleep(1)
+
+	thread.start_new_thread(printDatetime, ())
 	schedule.every(10).seconds.do(mainFun)
 
 	while True:
