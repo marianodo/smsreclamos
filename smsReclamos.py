@@ -113,68 +113,7 @@ class Modem(object):
         self.connection.close()
 
 class Parser(object):
-    def parseMessage(self, rawMessage):
-        
-        '''
-        ['+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n', 
-        '3407 Dirigirse a Rivadeo 1486 por ascensor fuera de servicio\r\n', '+CMGL: 1,"REC READ","22123",,
-        "18/10/02,15:29:03-12"\r\n', 'Telegram code 59896\r\n', '+CMGL: 2,"REC READ","+543517501403",,
-        "18/10/02,07:48:01-12"\r\n', 'El nro. 3517501403  llamo el 02/10 07:47  Para llamarlo, presiona SEND.\r\n',
-        '+CMGL: 3,"REC READ","+543516692434",,"18/10/02,17:52:47-12"\r\n', 'El nro. 3516692434  llamo el 02/10 17:52
-        Para llamarlo, presiona SEND.\r\n', '+CMGL: 4,"REC READ","+543512482435",,"18/10/02,19:17:37-12"\r\n', 
-        'El nro. 3512482435  llamo el 02/10 19:17  Para llamarlo, presiona SEND.\r\n', '+CMGL: 5,"REC READ","+543513024522"
-        ,,"18/10/02,19:37:45-12"\r\n', 'El nro. 3513024522  llamo el 02/10 19:37  Para llamarlo, presiona SEND.\r\n', 
-        '+CMGL: 6,"REC READ","22123",,"18/10/02,23:24:26-12"\r\n', 'Telegram code 95705\r\n', '+CMGL: 7,"REC READ",
-        "+543513998344",,"18/10/01,23:30:31-12"\r\n', '9999 PRUEBA TEST SMS (79549)\r\n', '+CMGL: 8,"REC READ",
-        "+543513998344",,"18/10/02,02:30:25-12"\r\n', '9999 PRUEBA TEST SMS (79555)\r\n', '+CMGL: 14,"REC READ",
-        "+543515073753",,"18/10/02,03:00:31-12"\r\n', '9999 PRUEBA TEST SMS (79556)\r\n']
-        '''
-        
-        for pos in xrange(0, len(rawMessage), 2):
-            try:
-                    dataMsg = rawMessage[pos + 1]
-            except:
-                    print rawMessage
-                    print "ERROR"
-                    pass
-            if "REC READ" in rawMessage[pos] or "REC UNREAD" in rawMessage[pos]:
-                logging.info(rawMessage[pos])
-                logging.info(dataMsg)
-                posId, phone = self.parseMetadata(rawMessage[pos])
-                code, message = self.parseMsg(dataMsg)
-
-                if code != ERR:
-                        if code == '9999':
-                                answerTest = ANSWER_TEST_MSG.format(message.split()[-1], phone)
-                                print "Respondiendo TEST " + answerTest
-                                db.sendMessage(ANSWER_TEST_CODE, answerTest)
-                        else:
-                                if db.isCodeExists(code):
-                                        print "Mensaje correcto. Enviando mensaje"
-                                        db.sendMessage(code, "{0}. Enviado por: {1}".format(message, phone))
-                                        db.answerCustomer(ANSWER_TO_CUSTOMER.format(code), phone)
-                                else:
-                                        print "Codigo no existe. Respondiando al usuario"
-                                        db.answerCustomer(BAD_CODE.format(code), phone)
-                else:
-                        print "Mensaje invalido, respondiendo al usuario"
-                        logging.warning("Mensaje Invalido: {0}".format(dataMsg))
-                        db.answerCustomer(INVALID_FORMAT, phone)
-
-                print rawMessage[pos + 1]
-
-        
-    def parseMetadata(self, data):
-                try:
-                        #data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
-                        parsedMeta = data.split(",")
-                        #parsedMeta = ['+CMGL: 0', '"REC READ"', '"+543513162097"', '', '"18/10/02', '19:10:15-12"\r\n']
-                        posId = parsedMeta[0].split(" ")[1].strip('"')
-                        phone = (parsedMeta[2]).strip('"')
-                        return posId, phone
-                except:
-                        logging.warning("Formato invalido - {0}".format(data))
-                        return 0
+    
 
     def getMessagePosition(self, msg):
         #data = '"+CMGL: 0,"REC READ","+543513162097",,"18/10/02,19:10:15-12"\r\n'
@@ -216,13 +155,13 @@ if __name__ == '__main__':
 
     def mainFun():
         rawMessage = modem.readMessage()
-        for pos in xrange(0, len(rawMessage), 2):
+        for pos in range(0, len(rawMessage), 2):
             try:
                     metadata = rawMessage[pos]
                     dataMsg = rawMessage[pos + 1]
             except:
-                    print rawMessage
-                    print "ERROR"
+                    print(rawMessage)
+                    print("ERROR")
                     pass
             if "REC READ" in metadata or "REC UNREAD" in metadata:
                 posId = parser.getMessagePosition(metadata)
@@ -232,20 +171,20 @@ if __name__ == '__main__':
                 if code != ERR:
                     if code == '9999':
                         answerTest = ANSWER_TEST_MSG.format(message.split()[-1], phone)
-                        print "Respondiendo TEST " + answerTest
+                        print("Respondiendo TEST " + answerTest)
                         db.sendMessage(ANSWER_TEST_CODE, answerTest)
                     elif db.isCodeExists(code):
-                        print "Mensaje correcto. Enviando mensaje"
+                        print("Mensaje correcto. Enviando mensaje")
                         db.sendMessage(code, "{0}. Enviado por: {1}".format(message, phone))
                         db.answerCustomer(ANSWER_TO_CUSTOMER.format(code), phone)
                     else:
-                        print "Codigo no existe. Respondiando al usuario"
+                        print("Codigo no existe. Respondiando al usuario")
                         db.answerCustomer(BAD_CODE.format(code), phone)
                 else:
-                        print "Mensaje invalido, respondiendo al usuario"
+                        print("Mensaje invalido, respondiendo al usuario")
                         logging.warning("Mensaje Invalido: {0}".format(dataMsg))
                         db.answerCustomer(INVALID_FORMAT, phone)
-                print dataMsg
+                print(dataMsg)
                 modem.deleteMessageAtPosc(posId)
 
 
